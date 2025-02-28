@@ -1,0 +1,1270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Woodcut G-code Generator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f7f7f7;
+        }
+        h1, h2 {
+            color: #2c3e50;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .input-section, .preview-section, .output-section {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        canvas {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            min-width: 150px;
+        }
+        label {
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        input, select, button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button.download-btn {
+            background-color: #27ae60;
+        }
+        button.download-btn:hover {
+            background-color: #219653;
+        }
+        input[type="file"] {
+            border: none;
+            padding: 0;
+        }
+        .progress-bar {
+            height: 10px;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        .progress-bar-inner {
+            height: 100%;
+            background-color: #3498db;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .info-box {
+            background-color: #e8f4f8;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 0 4px 4px 0;
+        }
+        .styles-selector {
+            margin-bottom: 20px;
+        }
+        .style-option {
+            display: inline-block;
+            margin-right: 15px;
+            cursor: pointer;
+        }
+        .style-option input {
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Woodcut G-code Generator</h1>
+    
+    <div class="info-box">
+        <p>This tool converts photographs into G-code that can be used with CNC machines to create woodcut-style engravings. 
+        Upload an image, adjust the parameters, and download the G-code file for your CNC mill.</p>
+    </div>
+
+    <div class="container">
+        <div class="input-section">
+            <h2>Input Image</h2>
+            <div class="controls">
+                <div class="control-group">
+                    <label for="imageInput">Upload Image:</label>
+                    <input type="file" id="imageInput" accept="image/*">
+                </div>
+                <div class="control-group">
+                    <label for="resolutionInput">Output Width (mm):</label>
+                    <input type="number" id="resolutionInput" value="150" min="50" max="1000">
+                </div>
+            </div>
+            
+            <h3>Woodcut Style</h3>
+            <div class="styles-selector">
+                <label class="style-option">
+                    <input type="radio" name="woodcutStyle" value="contour" checked> Contoured Lines
+                </label>
+                <label class="style-option">
+                    <input type="radio" name="woodcutStyle" value="crosshatch"> Cross-hatched
+                </label>
+                <label class="style-option">
+                    <input type="radio" name="woodcutStyle" value="flow"> Flow Field
+                </label>
+            </div>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label for="lineSpacingInput">Line Spacing (mm):</label>
+                    <input type="number" id="lineSpacingInput" value="1" min="0.5" max="10" step="0.5">
+                </div>
+                <div class="control-group">
+                    <label for="minLineLengthInput">Min Line Length (mm):</label>
+                    <input type="number" id="minLineLengthInput" value="5" min="1" max="50">
+                </div>
+                <div class="control-group">
+                    <label for="maxLineLengthInput">Max Line Length (mm):</label>
+                    <input type="number" id="maxLineLengthInput" value="20" min="5" max="100">
+                </div>
+                <div class="control-group">
+                    <label for="curvatureInput">Line Curvature:</label>
+                    <input type="range" id="curvatureInput" value="50" min="0" max="100">
+                </div>
+                <div class="control-group">
+                    <label for="lineDensityInput">Line Density:</label>
+                    <input type="range" id="lineDensityInput" value="60" min="10" max="100">
+                </div>
+                <div class="control-group">
+                    <label for="contrastInput">Contrast:</label>
+                    <input type="range" id="contrastInput" value="50" min="0" max="100">
+                </div>
+                <div class="control-group">
+                    <label for="randomnessInput">Randomness:</label>
+                    <input type="range" id="variationInput" value="30" min="0" max="100">
+                </div>
+            </div>
+            <button id="processButton" disabled>Process Image</button>
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-bar-inner" id="progressBarInner"></div>
+            </div>
+        </div>
+
+        <div class="preview-section">
+            <h2>Preview</h2>
+            <div class="preview-container">
+                <div>
+                    <h3>Original Image</h3>
+                    <canvas id="originalCanvas"></canvas>
+                </div>
+                <div>
+                    <h3>Woodcut Preview</h3>
+                    <canvas id="previewCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="output-section">
+            <h2>G-code Output</h2>
+            <div class="controls">
+                <div class="control-group">
+                    <label for="cuttingDepthInput">Cutting Depth (mm):</label>
+                    <input type="number" id="cuttingDepthInput" value="-1.5" min="-10" max="0" step="0.1">
+                </div>
+                <div class="control-group">
+                    <label for="toolDiameterInput">Tool Diameter (mm):</label>
+                    <input type="number" id="toolDiameterInput" value="3.175" min="0.1" max="10" step="0.1">
+                </div>
+                <div class="control-group">
+                    <label for="feedRateInput">Feed Rate (mm/min):</label>
+                    <input type="number" id="feedRateInput" value="300" min="50" max="1000" step="10">
+                </div>
+                <div class="control-group">
+                    <label for="plungeRateInput">Plunge Rate (mm/min):</label>
+                    <input type="number" id="plungeRateInput" value="100" min="10" max="500" step="10">
+                </div>
+                <div class="control-group">
+                    <label for="safeZInput">Safe Z Height (mm):</label>
+                    <input type="number" id="safeZInput" value="5" min="1" max="20" step="0.5">
+                </div>
+            </div>
+            <button id="generateGcodeButton" class="download-btn" disabled>Generate & Download G-code</button>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+let originalImage = null;
+let processedPaths = [];
+let aspectRatio = 1;
+
+// DOM elements
+const imageInput = document.getElementById('imageInput');
+const processButton = document.getElementById('processButton');
+const generateGcodeButton = document.getElementById('generateGcodeButton');
+const originalCanvas = document.getElementById('originalCanvas');
+const previewCanvas = document.getElementById('previewCanvas');
+const progressBar = document.getElementById('progressBar');
+const progressBarInner = document.getElementById('progressBarInner');
+
+// Input elements
+const resolutionInput = document.getElementById('resolutionInput');
+const lineSpacingInput = document.getElementById('lineSpacingInput');
+const minLineLengthInput = document.getElementById('minLineLengthInput');
+const maxLineLengthInput = document.getElementById('maxLineLengthInput');
+const curvatureInput = document.getElementById('curvatureInput');
+const densityInput = document.getElementById('lineDensityInput');
+const variationInput = document.getElementById('variationInput');
+const cuttingDepthInput = document.getElementById('cuttingDepthInput');
+const toolDiameterInput = document.getElementById('toolDiameterInput');
+const feedRateInput = document.getElementById('feedRateInput');
+const plungeRateInput = document.getElementById('plungeRateInput');
+const safeZInput = document.getElementById('safeZInput');
+
+// Event listeners
+imageInput.addEventListener('change', handleImageUpload);
+processButton.addEventListener('click', processImage);
+generateGcodeButton.addEventListener('click', generateAndDownloadGcode);
+
+// Image upload handler
+function handleImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            originalImage = img;
+            aspectRatio = img.height / img.width;
+            
+            // Resize canvas to match image aspect ratio
+            const maxWidth = 400;
+            originalCanvas.width = maxWidth;
+            originalCanvas.height = maxWidth * aspectRatio;
+            
+            // Draw original image on canvas
+            const ctx = originalCanvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, originalCanvas.width, originalCanvas.height);
+            
+            // Enable process button
+            processButton.disabled = false;
+            
+            // Set up preview canvas with same dimensions
+            previewCanvas.width = originalCanvas.width;
+            previewCanvas.height = originalCanvas.height;
+            
+            // Clear any existing content
+            const previewCtx = previewCanvas.getContext('2d');
+            previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            previewCtx.fillStyle = '#2c3e50'; // Dark blue background like in reference
+            previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+// Process image to generate woodcut paths
+function processImage() {
+    if (!originalImage) {
+        alert('Please upload an image first.');
+        return;
+    }
+    
+    // Get parameters
+    const targetWidth = parseInt(resolutionInput.value);
+    const lineSpacing = parseFloat(lineSpacingInput.value);
+    const minLineLength = parseInt(minLineLengthInput.value);
+    const maxLineLength = parseInt(maxLineLengthInput.value);
+    const curvature = parseInt(curvatureInput.value) / 100;
+    const density = parseInt(lineDensityInput.value) / 100;
+    const variation = parseInt(variationInput.value) / 100;
+    const contrastValue = parseInt(contrastInput.value) / 100;
+    
+    // Get selected woodcut style
+    const styleElements = document.getElementsByName('woodcutStyle');
+    let selectedStyle = 'contour';
+    for (const element of styleElements) {
+        if (element.checked) {
+            selectedStyle = element.value;
+            break;
+        }
+    }
+    
+    // Set up progress updates
+    progressBarInner.style.width = '0%';
+    
+    // Get the image data
+    const ctx = originalCanvas.getContext('2d');
+    const imageData = ctx.getImageData(0, 0, originalCanvas.width, originalCanvas.height);
+    
+    const workerCode = `
+    // Helper functions
+    function lerp(a, b, t) {
+        return a + t * (b - a);
+    }
+
+    function random(min, max, seed) {
+        const x = Math.sin(seed * 12345.6789) * 10000;
+        return min + (x - Math.floor(x)) * (max - min);
+    }
+    
+    function fade(t) {
+        return t * t * t * (t * (t * 6 - 15) + 10);
+    }
+    
+    function noise(x, y, z) {
+        const X = Math.floor(x) & 255;
+        const Y = Math.floor(y) & 255;
+        const Z = Math.floor(z) & 255;
+        
+        x -= Math.floor(x);
+        y -= Math.floor(y);
+        z -= Math.floor(z);
+        
+        const u = fade(x);
+        const v = fade(y);
+        const w = fade(z);
+        
+        // Using the x, y, z values as a simple hash
+        const A = (X * 3 + Y * 5 + Z * 7) % 255;
+        const B = (X * 7 + Y * 11 + Z * 13) % 255;
+        
+        const h1 = ((A + X) * 3 + (B + Y) * 5 + (Z) * 7) % 255;
+        const h2 = ((A + X) * 7 + (B + Y) * 11 + (Z) * 13) % 255;
+        
+        // Simple mapping to -1 to 1
+        const g1 = (h1 / 255) * 2 - 1;
+        const g2 = (h2 / 255) * 2 - 1;
+        
+        // Blend based on fade curves
+        return lerp(g1, g2, u) * 0.5 + 0.5;
+    }
+    
+    // Adjust contrast
+    function adjustContrast(gray, width, height, contrastFactor) {
+        const result = new Uint8Array(width * height);
+        
+        // Apply contrast adjustment
+        const factor = (259 * (contrastFactor * 2 + 1)) / (255 * (259 - contrastFactor * 2));
+        
+        for (let i = 0; i < gray.length; i++) {
+            const adjusted = factor * (gray[i] - 128) + 128;
+            result[i] = Math.max(0, Math.min(255, Math.round(adjusted)));
+        }
+        
+        return result;
+    }
+    
+    // Simple edge detection
+    function detectEdges(gray, width, height) {
+        const edges = new Uint8Array(width * height);
+        const gradientMagnitude = new Uint8Array(width * height);
+        const gradientDirection = new Float32Array(width * height);
+        
+        // Compute gradient using Sobel operator
+        for (let y = 1; y < height - 1; y++) {
+            for (let x = 1; x < width - 1; x++) {
+                // Sobel kernels
+                const gx = 
+                    -1 * gray[(y-1) * width + (x-1)] +
+                     0 * gray[(y-1) * width + x] +
+                     1 * gray[(y-1) * width + (x+1)] +
+                    -2 * gray[y * width + (x-1)] +
+                     0 * gray[y * width + x] +
+                     2 * gray[y * width + (x+1)] +
+                    -1 * gray[(y+1) * width + (x-1)] +
+                     0 * gray[(y+1) * width + x] +
+                     1 * gray[(y+1) * width + (x+1)];
+                         
+                const gy = 
+                    -1 * gray[(y-1) * width + (x-1)] +
+                    -2 * gray[(y-1) * width + x] +
+                    -1 * gray[(y-1) * width + (x+1)] +
+                     0 * gray[y * width + (x-1)] +
+                     0 * gray[y * width + x] +
+                     0 * gray[y * width + (x+1)] +
+                     1 * gray[(y+1) * width + (x-1)] +
+                     2 * gray[(y+1) * width + x] +
+                     1 * gray[(y+1) * width + (x+1)];
+                
+                // Calculate gradient magnitude
+                const magnitude = Math.sqrt(gx * gx + gy * gy);
+                gradientMagnitude[y * width + x] = Math.min(255, magnitude);
+                
+                // Calculate gradient direction (in degrees)
+                let angle = Math.atan2(gy, gx) * 180 / Math.PI;
+                if (angle < 0) angle += 360;
+                gradientDirection[y * width + x] = angle;
+                
+                // Threshold to detect edges
+                if (magnitude > 30) {
+                    edges[y * width + x] = 255;
+                }
+            }
+        }
+        
+        return {
+            edges: edges,
+            magnitude: gradientMagnitude,
+            direction: gradientDirection
+        };
+    }
+    
+    // Generate flow field based on image features
+    function generateFlowField(gray, width, height, curvature) {
+        // Detect edges
+        const edgeData = detectEdges(gray, width, height);
+        const edges = edgeData.edges;
+        const gradientDirection = edgeData.direction;
+        
+        // Create flow field
+        const flowField = new Float32Array(width * height);
+        
+        // Initialize flow field
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const idx = y * width + x;
+                
+                if (edges[idx] > 0) {
+                    // On edges, flow along the edge (perpendicular to gradient)
+                    flowField[idx] = (gradientDirection[idx] + 90) % 360;
+                } else {
+                    // Off edges, use noise with some influence from nearby edges
+                    let sumX = 0, sumY = 0;
+                    let weightSum = 0;
+                    
+                    // Look for nearby edges
+                    const radius = 10;
+                    for (let dy = -radius; dy <= radius; dy++) {
+                        for (let dx = -radius; dx <= radius; dx++) {
+                            const nx = x + dx;
+                            const ny = y + dy;
+                            
+                            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                                const nidx = ny * width + nx;
+                                
+                                if (edges[nidx] > 0) {
+                                    // Weight by distance
+                                    const dist = Math.sqrt(dx*dx + dy*dy);
+                                    const weight = 1 / (1 + dist);
+                                    
+                                    // Convert angle to vector
+                                    const edgeAngle = (gradientDirection[nidx] + 90) % 360;
+                                    const radians = edgeAngle * Math.PI / 180;
+                                    sumX += Math.cos(radians) * weight;
+                                    sumY += Math.sin(radians) * weight;
+                                    weightSum += weight;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (weightSum > 0) {
+                        // Use average direction from nearby edges
+                        const avgAngle = Math.atan2(sumY, sumX) * 180 / Math.PI;
+                        flowField[idx] = avgAngle < 0 ? avgAngle + 360 : avgAngle;
+                    } else {
+                        // No nearby edges, use noise
+                        flowField[idx] = (noise(x * 0.02, y * 0.02, 0) * 360) % 360;
+                    }
+                    
+                    // Add curvature-based variation
+                    flowField[idx] += (noise(x * 0.05, y * 0.05, 0.5) * 2 - 1) * 30 * curvature;
+                }
+            }
+        }
+        
+        return {
+            flowField: flowField,
+            edges: edges
+        };
+    }
+    
+    // Generate contour paths for the 'Contoured Lines' style - MOVED INSIDE WORKER
+    function generateContourPaths(gray, width, height, threshold) {
+        const paths = [];
+        const edgeData = detectEdges(gray, width, height);
+        const edges = edgeData.edges;
+        const visited = new Uint8Array(width * height);
+        
+        // Find edge pixels as starting points
+        for (let y = 1; y < height - 1; y++) {
+            for (let x = 1; x < width - 1; x++) {
+                const idx = y * width + x;
+                
+                // Skip if not an edge or already visited
+                if (edges[idx] === 0 || visited[idx]) continue;
+                
+                // Start a new path
+                const path = [{x, y}];
+                visited[idx] = 1;
+                
+                // Trace the edge in both directions
+                let foundNext = true;
+                
+                // Keep adding points while we can find connected edge pixels
+                while (foundNext) {
+                    foundNext = false;
+                    const lastPoint = path[path.length - 1];
+                    
+                    // Check 8 neighboring pixels
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            if (dx === 0 && dy === 0) continue;
+                            
+                            const nx = lastPoint.x + dx;
+                            const ny = lastPoint.y + dy;
+                            
+                            if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+                            
+                            const nidx = ny * width + nx;
+                            
+                            if (edges[nidx] > 0 && !visited[nidx]) {
+                                // Add to path
+                                path.push({x: nx, y: ny});
+                                visited[nidx] = 1;
+                                foundNext = true;
+                                break;
+                            }
+                        }
+                        if (foundNext) break;
+                    }
+                }
+                
+                // Only add paths with enough points
+                if (path.length >= 3) {
+                    paths.push({
+                        points: path,
+                        type: 'contour',
+                        brightness: 0 // Contours are always dark
+                    });
+                }
+            }
+        }
+        
+        return paths;
+    }
+    
+    // Generate cross-hatching paths - MOVED INSIDE WORKER
+    function generateCrossHatchingPaths(gray, width, height, density, lineSpacing, minLength, maxLength, variation) {
+        const paths = [];
+        
+        // Create multiple layers of hatching at different angles
+        const angles = [0, 45, 90, 135];
+        const brightnessThresholds = [200, 150, 100, 50]; // Darker areas get more hatching layers
+        
+        for (let angleIndex = 0; angleIndex < angles.length; angleIndex++) {
+            const baseAngle = angles[angleIndex];
+            const brightnessThreshold = brightnessThresholds[angleIndex];
+            
+            // Adjust spacing based on angle layer
+            const layerSpacing = Math.max(3, Math.round(lineSpacing * 10));
+            
+            // Create visited map for this angle
+            const visited = new Uint8Array(width * height);
+            
+            // Generate hatching lines at this angle
+            for (let offset = 0; offset < width + height; offset += layerSpacing) {
+                // Calculate start and end points for this line
+                let startX, startY, endX, endY;
+                
+                if (baseAngle === 0) { // Horizontal lines
+                    startX = 0;
+                    startY = offset;
+                    endX = width;
+                    endY = offset;
+                    
+                    if (startY >= height) {
+                        startY = height - 1;
+                        startX = offset - height + 1;
+                    }
+                    if (endY >= height) {
+                        endY = height - 1;
+                        endX = offset - height + 1 + width;
+                    }
+                } else if (baseAngle === 90) { // Vertical lines
+                    startX = offset;
+                    startY = 0;
+                    endX = offset;
+                    endY = height;
+                    
+                    if (startX >= width) {
+                        startX = width - 1;
+                        startY = offset - width + 1;
+                    }
+                    if (endX >= width) {
+                        endX = width - 1;
+                        endY = offset - width + 1 + height;
+                    }
+                } else if (baseAngle === 45) { // Diagonal (45°)
+                    startX = 0;
+                    startY = offset;
+                    endX = offset;
+                    endY = 0;
+                    
+                    if (startY >= height) {
+                        startY = height - 1;
+                        startX = offset - height + 1;
+                    }
+                    if (endX >= width) {
+                        endX = width - 1;
+                        endY = offset - width + 1;
+                    }
+                } else { // Diagonal (135°)
+                    startX = 0;
+                    startY = height - 1 - offset;
+                    endX = offset;
+                    endY = height - 1;
+                    
+                    if (startY < 0) {
+                        startY = 0;
+                        startX = offset - (height - 1);
+                    }
+                    if (endX >= width) {
+                        endX = width - 1;
+                        endY = height - 1 - (offset - (width - 1));
+                    }
+                }
+                
+                // Skip if out of bounds
+                if (startX < 0 || startX >= width || startY < 0 || startY >= height ||
+                    endX < 0 || endX >= width || endY < 0 || endY >= height) {
+                    continue;
+                }
+                
+                // Create line segments along this path
+                const dx = endX - startX;
+                const dy = endY - startY;
+                const steps = Math.max(Math.abs(dx), Math.abs(dy));
+                
+                if (steps === 0) continue;
+                
+                const xStep = dx / steps;
+                const yStep = dy / steps;
+                
+                let currentPath = [];
+                let lastBrightness = -1;
+                
+                for (let step = 0; step <= steps; step++) {
+                    const x = Math.round(startX + xStep * step);
+                    const y = Math.round(startY + yStep * step);
+                    
+                    if (x < 0 || x >= width || y < 0 || y >= height) continue;
+                    
+                    const idx = y * width + x;
+                    const brightness = gray[idx];
+                    
+                    // Only draw in areas darker than the threshold for this angle
+                    if (brightness < brightnessThreshold) {
+                        // Add variation based on brightness
+                        const variationFactor = variation * (1 - brightness / 255);
+                        
+                        // Skip some pixels based on brightness and randomness
+                        if (random(0, 1, x * y * 0.2) < variationFactor * 0.3) {
+                            // If we have a current path, finish it
+                            if (currentPath.length > 0) {
+                                if (currentPath.length >= 3) {
+                                    paths.push({
+                                        points: currentPath,
+                                        type: 'crosshatch',
+                                        angle: baseAngle,
+                                        brightness: lastBrightness
+                                    });
+                                }
+                                currentPath = [];
+                            }
+                            continue;
+                        }
+                        
+                        // Start a new path if needed
+                        if (currentPath.length === 0) {
+                            currentPath = [{x, y}];
+                            lastBrightness = brightness;
+                        } else {
+                            // Add to current path
+                            currentPath.push({x, y});
+                            // Update average brightness
+                            lastBrightness = (lastBrightness + brightness) / 2;
+                        }
+                    } else {
+                        // If we have a current path, finish it
+                        if (currentPath.length > 0) {
+                            if (currentPath.length >= 3) {
+                                paths.push({
+                                    points: currentPath,
+                                    type: 'crosshatch',
+                                    angle: baseAngle,
+                                    brightness: lastBrightness
+                                });
+                            }
+                            currentPath = [];
+                        }
+                    }
+                }
+                
+                // Add the last path if it exists
+                if (currentPath.length >= 3) {
+                    paths.push({
+                        points: currentPath,
+                        type: 'crosshatch',
+                        angle: baseAngle,
+                        brightness: lastBrightness
+                    });
+                }
+            }
+        }
+        
+        return paths;
+    }
+    
+    // Generate flow field paths
+    function generateFlowFieldPaths(gray, width, height, flowFieldData, density, lineSpacing, minLength, maxLength, variation) {
+        const paths = [];
+        const visited = new Uint8Array(width * height);
+        const flowField = flowFieldData.flowField;
+        const edges = flowFieldData.edges;
+        
+        // Create feature importance map
+        const importance = new Float32Array(width * height);
+        
+        // Mark edges as important
+        for (let i = 0; i < edges.length; i++) {
+            if (edges[i] > 0) {
+                importance[i] = 1.0;
+                
+                // Also mark surrounding pixels as somewhat important
+                const x = i % width;
+                const y = Math.floor(i / width);
+                
+                for (let dy = -2; dy <= 2; dy++) {
+                    for (let dx = -2; dx <= 2; dx++) {
+                        const nx = x + dx;
+                        const ny = y + dy;
+                        
+                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                            const dist = Math.sqrt(dx*dx + dy*dy);
+                            const nidx = ny * width + nx;
+                            importance[nidx] = Math.max(importance[nidx], 1.0 - dist/3);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Adjust spacing based on density
+        const baseSpacing = Math.max(2, Math.round(8 / density));
+        
+        // Create seed points in a grid pattern
+        for (let y = 5; y < height - 5; y += baseSpacing) {
+            for (let x = 5; x < width - 5; x += baseSpacing) {
+                // Skip if already visited
+                if (visited[y * width + x]) continue;
+                
+                const brightness = gray[y * width + x];
+                const idx = y * width + x;
+                const featureImportance = importance[idx];
+                
+                // Adjust local spacing based on feature importance
+                if (featureImportance > 0.1) {
+                    // Higher chance to create a path near important features
+                    const localDensity = density * (1 + featureImportance);
+                    
+                    // Skip based on brightness and density
+                    if (brightness > 230 && random(0, 1, x * y * 0.1) > localDensity) {
+                        continue;
+                    }
+                } else {
+                    // Regular density-based skipping in non-feature areas
+                    const localDensity = density * (1 - brightness / 255) * 1.2;
+                    if (brightness > 200 || random(0, 1, x * y * 0.1) > localDensity) {
+                        continue;
+                    }
+                }
+                
+                // Create bidirectional path
+                const forwardPath = [{x, y}];
+                const backwardPath = [];
+                visited[y * width + x] = 1;
+                
+                // Determine path length - longer near important features
+                const lengthBoost = featureImportance * 0.5 + 1;
+                const lineLength = lerp(
+                    minLength / 2, 
+                    maxLength / 2,
+                    (1 - brightness / 255) * lengthBoost * (1 + random(-0.2, 0.2, x + y) * variation)
+                );
+                
+                // Trace forward
+                let currX = x, currY = y;
+                for (let step = 0; step < lineLength; step++) {
+                    // Get flow direction
+                    const idx = Math.floor(currY) * width + Math.floor(currX);
+                    if (idx < 0 || idx >= width * height) break;
+                    
+                    let angle = flowField[idx];
+                    
+                    // Add variation based on feature importance
+                    // Less variation near important features
+                    const localVariation = variation * (1 - importance[idx] * 0.7);
+                    angle += random(-8, 8, currX * currY * step) * localVariation;
+                    
+                    // Move along flow direction
+                    const angleRad = angle * Math.PI / 180;
+                    const stepSize = 1 + (1 - brightness / 255);
+                    
+                    currX += Math.cos(angleRad) * stepSize;
+                    currY += Math.sin(angleRad) * stepSize;
+                    
+                    // Check bounds
+                    if (currX < 5 || currX >= width - 5 || currY < 5 || currY >= height - 5) {
+                        break;
+                    }
+                    
+                    // Round to integer for visited check
+                    const ix = Math.floor(currX);
+                    const iy = Math.floor(currY);
+                    
+                    // Skip if already visited
+                    if (visited[iy * width + ix]) {
+                        break;
+                    }
+                    
+                    // Add to path
+                    forwardPath.push({x: currX, y: currY});
+                    visited[iy * width + ix] = 1;
+                }
+                
+                // Trace backward
+                currX = x;
+                currY = y;
+                for (let step = 0; step < lineLength; step++) {
+                    // Get flow direction (opposite to forward direction)
+                    const idx = Math.floor(currY) * width + Math.floor(currX);
+                    if (idx < 0 || idx >= width * height) break;
+                    
+                    let angle = (flowField[idx] + 180) % 360;
+                    
+                    // Add variation based on feature importance
+                    const localVariation = variation * (1 - importance[idx] * 0.7);
+                    angle += random(-8, 8, currX * currY * step) * localVariation;
+                    
+                    // Move along flow direction
+                    const angleRad = angle * Math.PI / 180;
+                    const stepSize = 1 + (1 - brightness / 255);
+                    
+                    currX += Math.cos(angleRad) * stepSize;
+                    currY += Math.sin(angleRad) * stepSize;
+                    
+                    // Check bounds
+                    if (currX < 5 || currX >= width - 5 || currY < 5 || currY >= height - 5) {
+                        break;
+                    }
+                    
+                    // Round to integer for visited check
+                    const ix = Math.floor(currX);
+                    const iy = Math.floor(currY);
+                    
+                    // Skip if already visited
+                    if (visited[iy * width + ix]) {
+                        break;
+                    }
+                    
+                    // Add to path
+                    backwardPath.unshift({x: currX, y: currY});
+                    visited[iy * width + ix] = 1;
+                }
+                
+                // Combine paths
+                const fullPath = [...backwardPath, ...forwardPath];
+                
+                // Only add paths with enough points
+                if (fullPath.length >= 3) {
+                    paths.push({
+                        points: fullPath,
+                        type: 'flow',
+                        brightness: brightness,
+                        importance: featureImportance
+                    });
+                }
+            }
+        }
+        
+        return paths;
+    }
+    
+    // Main worker message handler
+    self.onmessage = function(e) {
+        const { 
+            imageData, width, height, 
+            lineSpacing, minLineLength, maxLineLength,
+            curvature, density, variation, contrastValue,
+            selectedStyle
+        } = e.data;
+        
+        // Create grayscale array
+        const gray = new Uint8Array(width * height);
+        for (let i = 0; i < height; i++) {
+            for (let j = 0; j < width; j++) {
+                const idx = (i * width + j) * 4;
+                // Convert RGB to grayscale using luminance formula
+                gray[i * width + j] = Math.round(
+                    0.299 * imageData[idx] + 
+                    0.587 * imageData[idx + 1] + 
+                    0.114 * imageData[idx + 2]
+                );
+            }
+        }
+        
+        self.postMessage({ type: 'progress', value: 10 });
+        
+        // Apply contrast adjustment
+        const contrastedGray = adjustContrast(gray, width, height, contrastValue);
+        
+        self.postMessage({ type: 'progress', value: 20 });
+        
+        // Generate flow field with improved feature detection
+        const flowFieldData = generateFlowField(contrastedGray, width, height, curvature);
+        
+        self.postMessage({ type: 'progress', value: 40 });
+        
+        // Generate paths based on selected style
+        let allPaths = [];
+        
+        if (selectedStyle === 'contour') {
+            // Generate contour paths
+            const contourPaths = generateContourPaths(contrastedGray, width, height, 30);
+            allPaths = allPaths.concat(contourPaths);
+            
+            // Add some flow field paths for shading
+            const flowPaths = generateFlowFieldPaths(
+                contrastedGray, width, height, flowFieldData,
+                density * 0.7, lineSpacing, minLineLength, maxLineLength, variation
+            );
+            allPaths = allPaths.concat(flowPaths);
+            
+        } else if (selectedStyle === 'crosshatch') {
+            // Generate cross-hatching paths
+            const crossHatchPaths = generateCrossHatchingPaths(
+                contrastedGray, width, height,
+                density, lineSpacing, minLineLength, maxLineLength, variation
+            );
+            allPaths = allPaths.concat(crossHatchPaths);
+            
+        } else if (selectedStyle === 'flow') {
+            // Generate flow field paths
+            const flowPaths = generateFlowFieldPaths(
+                contrastedGray, width, height, flowFieldData,
+                density, lineSpacing, minLineLength, maxLineLength, variation
+            );
+            allPaths = allPaths.concat(flowPaths);
+        }
+        
+        self.postMessage({ 
+            type: 'complete', 
+            paths: allPaths,
+            imageWidth: width,
+            imageHeight: height
+        });
+    }
+`;
+
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const workerUrl = URL.createObjectURL(blob);
+    const worker = new Worker(workerUrl);
+    
+    // Set up worker handlers
+    worker.onmessage = function(e) {
+        const data = e.data;
+        
+        if (data.type === 'progress') {
+            progressBarInner.style.width = data.value + '%';
+        } else if (data.type === 'complete') {
+            progressBarInner.style.width = '100%';
+            
+            // Store generated paths
+            processedPaths = data.paths;
+            
+            // Draw preview
+            drawWoodcutPaths(data.paths);
+            
+            // Enable G-code generation
+            generateGcodeButton.disabled = false;
+            
+            // Clean up
+            URL.revokeObjectURL(workerUrl);
+        }
+    };
+    
+    // Start processing
+    worker.postMessage({
+        imageData: imageData.data,
+        width: originalCanvas.width,
+        height: originalCanvas.height,
+        lineSpacing,
+        minLineLength,
+        maxLineLength,
+        curvature,
+        density,
+        variation,
+        contrastValue,
+        selectedStyle
+    });
+}
+
+// Draw woodcut paths on the preview canvas
+function drawWoodcutPaths(paths) {
+    const ctx = previewCanvas.getContext('2d');
+    ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+    
+    // Fill with dark background
+    ctx.fillStyle = '#2c3e50';
+    ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+    
+    // Sort paths by type and importance
+    const sortedPaths = [...paths].sort((a, b) => {
+        // Sort by type first
+        const typeOrder = { 'flow': 0, 'crosshatch': 1, 'contour': 2 };
+        const typeA = typeOrder[a.type] || 0;
+        const typeB = typeOrder[b.type] || 0;
+        
+        if (typeA !== typeB) return typeA - typeB;
+        
+        // Then by importance if available
+        const importanceA = a.importance || 0;
+        const importanceB = b.importance || 0;
+        
+        return importanceA - importanceB;
+    });
+    
+    // Draw paths
+    for (const path of sortedPaths) {
+        if (path.points.length < 2) continue;
+        
+        // Set style based on path type and importance
+        ctx.strokeStyle = '#daa520'; // Golden color
+        
+        if (path.type === 'contour') {
+            // Contours are thicker
+            ctx.lineWidth = 1.5;
+            ctx.globalAlpha = 1.0;
+        } else if (path.type === 'crosshatch') {
+            // Cross-hatching is thinner
+            ctx.lineWidth = 0.75;
+            
+            // Adjust opacity based on angle for visual distinction
+            const opacity = 0.8 + (path.angle % 90) / 450;
+            ctx.globalAlpha = opacity;
+        } else {
+            // Flow paths
+            // Important features get thicker lines
+            if (path.importance && path.importance > 0.5) {
+                ctx.lineWidth = 0.75 + path.importance * 0.75;
+                ctx.globalAlpha = 0.85 + path.importance * 0.15;
+            } else {
+                ctx.lineWidth = 0.75;
+                
+                // Adjust opacity based on brightness
+                const opacity = 0.7 + (255 - path.brightness) / 255 * 0.3;
+                ctx.globalAlpha = opacity;
+            }
+        }
+        
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        // Draw the path
+        ctx.beginPath();
+        ctx.moveTo(path.points[0].x, path.points[0].y);
+        
+        // Draw curved paths
+        if (path.points.length <= 3) {
+            // Simple line for short paths
+            for (let i = 1; i < path.points.length; i++) {
+                ctx.lineTo(path.points[i].x, path.points[i].y);
+            }
+        } else {
+            // Smooth curve for longer paths
+            for (let i = 1; i < path.points.length - 2; i++) {
+                const xc = (path.points[i].x + path.points[i + 1].x) / 2;
+                const yc = (path.points[i].y + path.points[i + 1].y) / 2;
+                ctx.quadraticCurveTo(path.points[i].x, path.points[i].y, xc, yc);
+            }
+            
+            // Connect last points
+            ctx.quadraticCurveTo(
+                path.points[path.points.length - 2].x, 
+                path.points[path.points.length - 2].y, 
+                path.points[path.points.length - 1].x, 
+                path.points[path.points.length - 1].y
+            );
+        }
+        
+        ctx.stroke();
+        
+        // Reset opacity
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+// Generate G-code from paths and trigger download
+function generateAndDownloadGcode() {
+    if (processedPaths.length === 0) {
+        alert('Please process an image first.');
+        return;
+    }
+    
+    // Get milling parameters
+    const targetWidth = parseInt(resolutionInput.value);
+    const feedRate = parseInt(feedRateInput.value);
+    const plungeRate = parseInt(plungeRateInput.value);
+    const safeZ = parseFloat(safeZInput.value);
+    const baseCuttingDepth = parseFloat(cuttingDepthInput.value);
+    
+    // Calculate scaling factor from canvas pixels to real-world mm
+    const scaleFactor = targetWidth / originalCanvas.width;
+    
+    // Start G-code document
+    let gcode = [];
+    
+    // G-code preamble
+    gcode.push("G21 ; Set units to mm");
+    gcode.push("G90 ; Absolute positioning");
+    gcode.push(`G0 Z${safeZ} ; Move to safe height`);
+    gcode.push("M3 S10000 ; Turn on spindle");
+    gcode.push("G4 P1 ; Wait 1 second");
+    
+    // Sort paths by type for better machining order
+    // Process contours first, then hatching, then crosshatching
+    const sortedPaths = [...processedPaths].sort((a, b) => {
+        const typeOrder = { 'contour': 0, 'hatching': 1, 'crosshatch': 2, 'flow': 1 };
+        return typeOrder[a.type] - typeOrder[b.type];
+    });
+    
+    // Process paths
+    for (const path of sortedPaths) {
+        if (path.points.length < 2) continue;
+        
+        // Determine cutting depth based on path type
+        let cuttingDepth = baseCuttingDepth;
+        
+        // Contours are cut deeper for emphasis
+        if (path.type === 'contour') {
+            cuttingDepth = baseCuttingDepth * 1.2;
+        } else if (path.type === 'crosshatch' || path.type === 'hatching') {
+            // Adjust depth based on brightness for hatching
+            const brightnessAdjust = path.brightness ? (path.brightness / 255) : 0.5;
+            cuttingDepth = baseCuttingDepth * (0.7 + 0.3 * (1 - brightnessAdjust));
+        }
+        
+        // Scale coordinates to mm
+        const scaledPath = path.points.map(pt => ({
+            x: pt.x * scaleFactor,
+            y: pt.y * scaleFactor
+        }));
+        
+        // Move to the start of the path
+        const startX = scaledPath[0].x.toFixed(3);
+        const startY = scaledPath[0].y.toFixed(3);
+        gcode.push(`G0 X${startX} Y${startY} ; Rapid move to start`);
+        gcode.push(`G1 Z${cuttingDepth.toFixed(3)} F${plungeRate} ; Plunge to cutting depth`);
+        
+        // For very short paths, use simple linear moves
+        if (path.points.length <= 3) {
+            for (let i = 1; i < scaledPath.length; i++) {
+                const x = scaledPath[i].x.toFixed(3);
+                const y = scaledPath[i].y.toFixed(3);
+                gcode.push(`G1 X${x} Y${y} F${feedRate}`);
+            }
+        } else {
+            // For longer paths, use spline interpolation if supported, otherwise approximate
+            // with many small linear segments
+            const segmentCount = Math.min(path.points.length * 2, 50); // 2x points for smoothness
+            
+            for (let i = 1; i <= segmentCount; i++) {
+                const t = i / segmentCount;
+                
+                // Parametric interpolation along the path
+                let x = 0, y = 0;
+                let totalWeight = 0;
+                
+                // Simple weighted average interpolation
+                for (let j = 0; j < scaledPath.length; j++) {
+                    // Gaussian-like weighting
+                    const idx = j / (scaledPath.length - 1);
+                    const diff = Math.abs(t - idx);
+                    const weight = Math.exp(-diff * diff * 20);
+                    
+                    x += scaledPath[j].x * weight;
+                    y += scaledPath[j].y * weight;
+                    totalWeight += weight;
+                }
+                
+                if (totalWeight > 0) {
+                    x /= totalWeight;
+                    y /= totalWeight;
+                    gcode.push(`G1 X${x.toFixed(3)} Y${y.toFixed(3)} F${feedRate}`);
+                }
+            }
+        }
+        
+        // Lift at the end of path
+        gcode.push(`G0 Z${safeZ} ; Return to safe height`);
+    }
+    
+    // G-code footer
+    gcode.push("M5 ; Turn off spindle");
+    gcode.push("G0 X0 Y0 ; Return to origin");
+    gcode.push("M2 ; End program");
+    
+    // Create and download file
+    const blob = new Blob([gcode.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'woodcut.nc';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
